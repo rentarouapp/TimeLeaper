@@ -9,6 +9,15 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+extern NSString * const APIClientErrorDomain;
+
+typedef NS_ENUM(NSInteger, APIClientErrorCode) {
+    APIClientErrorCodeInvalidURL = -1,
+    APIClientErrorCodeNoData = -2,
+    APIClientErrorCodeUnexpectedFormat = -3,
+    // HTTPステータスコードは直接使用（200-599）
+};
+
 typedef void (^APIClientCompletion)(NSDictionary * _Nullable json, NSError * _Nullable error);
 
 @interface APIClient : NSObject

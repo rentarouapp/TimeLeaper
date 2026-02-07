@@ -7,6 +7,8 @@
 
 #import "APIClient.h"
 
+NSString * const APIClientErrorDomain = @"APIClientErrorDomain";
+
 @interface APIClient ()
 @property (nonatomic, strong) NSURL *baseURL;
 @property (nonatomic, strong) NSURLSession *session;
@@ -52,7 +54,7 @@
     NSURL *url = components.URL;
     if (!url) {
         if (completion) {
-            NSError *err = [NSError errorWithDomain:@"APIClientErrorDomain" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"Invalid URL"}];
+            NSError *err = [NSError errorWithDomain:APIClientErrorDomain code:APIClientErrorCodeInvalidURL userInfo:@{NSLocalizedDescriptionKey: @"Invalid URL"}];
             dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
         }
         return;
@@ -63,9 +65,28 @@
             if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, error); });
             return;
         }
+
+        // Check HTTP status code
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        if (httpResponse && [httpResponse isKindOfClass:[NSHTTPURLResponse class]]) {
+            NSInteger statusCode = httpResponse.statusCode;
+            if (statusCode < 200 || statusCode >= 300) {
+                if (completion) {
+                    NSString *message = [NSString stringWithFormat:@"HTTPエラー: %@ (ステータスコード: %ld)",
+                                        [NSHTTPURLResponse localizedStringForStatusCode:statusCode],
+                                        (long)statusCode];
+                    NSError *err = [NSError errorWithDomain:APIClientErrorDomain
+                                                      code:statusCode
+                                                  userInfo:@{NSLocalizedDescriptionKey: message}];
+                    dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
+                }
+                return;
+            }
+        }
+
         if (!data) {
             if (completion) {
-                NSError *err = [NSError errorWithDomain:@"APIClientErrorDomain" code:-2 userInfo:@{NSLocalizedDescriptionKey: @"No data returned"}];
+                NSError *err = [NSError errorWithDomain:APIClientErrorDomain code:APIClientErrorCodeNoData userInfo:@{NSLocalizedDescriptionKey: @"No data returned"}];
                 dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
             }
             return;
@@ -78,7 +99,7 @@
         }
         if (![json isKindOfClass:[NSDictionary class]]) {
             if (completion) {
-                NSError *err = [NSError errorWithDomain:@"APIClientErrorDomain" code:-3 userInfo:@{NSLocalizedDescriptionKey: @"Unexpected JSON format"}];
+                NSError *err = [NSError errorWithDomain:APIClientErrorDomain code:APIClientErrorCodeUnexpectedFormat userInfo:@{NSLocalizedDescriptionKey: @"Unexpected JSON format"}];
                 dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, err); });
             }
             return;
